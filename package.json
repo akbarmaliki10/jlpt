@@ -1,0 +1,28 @@
+{
+  "name": "jlpt-n4-srs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "node server.mjs",
+    "app": "node server.mjs --app",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@vercel/blob": "^2.9.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "wanakana": "^5.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vercel/node": "^32.0.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.0",
+    "vitest": "^3.0.0"
+  }
+}
