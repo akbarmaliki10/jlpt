@@ -1,5 +1,6 @@
 let audioCtx: AudioContext | null = null;
 let soundEnabled = true;
+let unlockBound = false;
 
 export function setSoundEnabled(enabled: boolean): void {
   soundEnabled = enabled;
@@ -12,18 +13,56 @@ export function isSoundEnabled(): boolean {
   return soundEnabled;
 }
 
-function getContext(): AudioContext | null {
-  if (!soundEnabled || typeof window === "undefined") return null;
+function ensureContext(): AudioContext | null {
+  if (typeof window === "undefined") return null;
   const Ctx =
     window.AudioContext ||
     (window as unknown as { webkitAudioContext?: typeof AudioContext })
       .webkitAudioContext;
   if (!Ctx) return null;
   if (!audioCtx) audioCtx = new Ctx();
-  if (audioCtx.state === "suspended") {
-    audioCtx.resume().catch(() => {});
-  }
   return audioCtx;
+}
+
+function bindGestureUnlock(): void {
+  if (unlockBound || typeof window === "undefined") return;
+  unlockBound = true;
+
+  const unlock = () => {
+    const ctx = ensureContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+    if (ctx.state === "running") {
+      window.removeEventListener("pointerdown", unlock, true);
+      window.removeEventListener("keydown", unlock, true);
+    }
+  };
+
+  window.addEventListener("pointerdown", unlock, true);
+  window.addEventListener("keydown", unlock, true);
+}
+
+bindGestureUnlock();
+
+function withAudio(fn: (ctx: AudioContext) => void): void {
+  if (!soundEnabled) return;
+  const ctx = ensureContext();
+  if (!ctx) return;
+
+  if (ctx.state === "running") {
+    fn(ctx);
+    return;
+  }
+
+  // Wait for AudioContext.resume() before scheduling tones so notes aren't dropped while suspended.
+  ctx
+    .resume()
+    .then(() => {
+      if (soundEnabled && ctx.state === "running") fn(ctx);
+    })
+    .catch(() => {});
 }
 
 function playTone(
@@ -54,43 +93,43 @@ function playTone(
 
 /** Bright two-note chime for a single correct answer. */
 export function playCorrectSound(): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  playTone(ctx, 587.33, 0, 0.12, "sine", 0.14); // D5
-  playTone(ctx, 880.0, 0.07, 0.18, "sine", 0.16); // A5
+  withAudio((ctx) => {
+    playTone(ctx, 587.33, 0, 0.13, "sine", 0.28); // D5
+    playTone(ctx, 880.0, 0.07, 0.2, "sine", 0.32); // A5
+  });
 }
 
 /** Extra rewarding rising arpeggio when a card completes and advances SRS stage. */
 export function playLevelUpSound(): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  playTone(ctx, 523.25, 0, 0.12, "triangle", 0.13); // C5
-  playTone(ctx, 659.25, 0.07, 0.12, "triangle", 0.14); // E5
-  playTone(ctx, 783.99, 0.14, 0.14, "triangle", 0.15); // G5
-  playTone(ctx, 1046.5, 0.21, 0.24, "sine", 0.16); // C6
+  withAudio((ctx) => {
+    playTone(ctx, 523.25, 0, 0.13, "triangle", 0.26); // C5
+    playTone(ctx, 659.25, 0.07, 0.13, "triangle", 0.28); // E5
+    playTone(ctx, 783.99, 0.14, 0.15, "triangle", 0.3); // G5
+    playTone(ctx, 1046.5, 0.21, 0.26, "sine", 0.32); // C6
+  });
 }
 
 /** Gentle low double-tone for a missed answer. */
 export function playWrongSound(): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  playTone(ctx, 240, 0, 0.11, "triangle", 0.14);
-  playTone(ctx, 185, 0.09, 0.16, "triangle", 0.13);
+  withAudio((ctx) => {
+    playTone(ctx, 240, 0, 0.12, "triangle", 0.3);
+    playTone(ctx, 185, 0.09, 0.18, "triangle", 0.28);
+  });
 }
 
 /** Upbeat celebratory "hooray" fanfare for completing a lesson or review session. */
 export function playCelebrationSound(): void {
-  const ctx = getContext();
-  if (!ctx) return;
-  // Crisp rising fanfare: C5 -> E5 -> G5 -> C6 -> G5 -> C6+E6+G6 chord
-  playTone(ctx, 523.25, 0.0, 0.11, "triangle", 0.15);
-  playTone(ctx, 659.25, 0.09, 0.11, "triangle", 0.15);
-  playTone(ctx, 783.99, 0.18, 0.11, "triangle", 0.16);
-  playTone(ctx, 1046.5, 0.27, 0.16, "sine", 0.18);
-  playTone(ctx, 783.99, 0.41, 0.1, "triangle", 0.14);
-  playTone(ctx, 1046.5, 0.5, 0.42, "sine", 0.18);
-  playTone(ctx, 1318.5, 0.5, 0.42, "sine", 0.12);
-  playTone(ctx, 1567.98, 0.5, 0.42, "triangle", 0.1);
+  withAudio((ctx) => {
+    // Crisp rising fanfare: C5 -> E5 -> G5 -> C6 -> G5 -> C6+E6+G6 chord
+    playTone(ctx, 523.25, 0.0, 0.12, "triangle", 0.28);
+    playTone(ctx, 659.25, 0.09, 0.12, "triangle", 0.28);
+    playTone(ctx, 783.99, 0.18, 0.12, "triangle", 0.3);
+    playTone(ctx, 1046.5, 0.27, 0.18, "sine", 0.32);
+    playTone(ctx, 783.99, 0.41, 0.11, "triangle", 0.26);
+    playTone(ctx, 1046.5, 0.5, 0.45, "sine", 0.32);
+    playTone(ctx, 1318.5, 0.5, 0.45, "sine", 0.22);
+    playTone(ctx, 1567.98, 0.5, 0.45, "triangle", 0.18);
+  });
 }
 
 export function canSpeakJapanese(): boolean {
